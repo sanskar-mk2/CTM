@@ -87,9 +87,11 @@ class ProjectExportController extends Controller
                         '.',
                         ','
                     ),
-                    'Status' =>  $this->sumActual($task->activities, $locks) >= $task->quantity
-                        ? 'Task Done'
-                        : 'WIP',
+                    'Status' =>  $this->sumActual($task->activities, $locks) > $task->quantity
+                        ? 'Raise Change Order'
+                        : ($this->sumActual($task->activities, $locks) == $task->quantity
+                            ? 'Task Done'
+                            : 'WIP'),
                 ]);
                 $data[] = $task_data;
             }

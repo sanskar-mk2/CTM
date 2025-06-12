@@ -97,6 +97,8 @@ const refresh = () => {
     console.log("refreshing");
     project.value = props.project;
 };
+
+const showDates = ref(true);
 </script>
 
 <template>
@@ -158,7 +160,10 @@ const refresh = () => {
 
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div v-if="hasRole(['Admin', 'Super Admin'], auth.user)" class="bg-white shadow-sm sm:rounded-lg">
+                <div
+                    v-if="hasRole(['Admin', 'Super Admin'], auth.user)"
+                    class="bg-white shadow-sm sm:rounded-lg"
+                >
                     <div class="p-6 text-gray-900">
                         <h2
                             class="font-semibold text-xl text-gray-800 leading-tight"
@@ -230,7 +235,19 @@ const refresh = () => {
                     class="mt-8 bg-white overflow-hidden shadow-sm sm:rounded-lg"
                 >
                     <div class="p-6 text-gray-900">
-                        <GroupsList :auth="auth" :project="project" />
+                        <div class="flex items-center mb-2">
+                            <input
+                                type="checkbox"
+                                v-model="showDates"
+                                class="checkbox checkbox-primary scale-90 mr-2"
+                            />
+                            <span class="text-sm">Show Date Columns</span>
+                        </div>
+                        <GroupsList
+                            :auth="auth"
+                            :project="project"
+                            :show-dates="showDates"
+                        />
                     </div>
                 </div>
             </div>
