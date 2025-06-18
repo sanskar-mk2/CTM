@@ -30,10 +30,10 @@ class ProjectController extends Controller
 
         if ($user->hasRole(['Super Admin', 'Admin'])) {
             // Super Admin and Admin can see all projects
-            $projects = Project::with('createdBy')->get();
+            $projects = Project::with('createdBy', 'groups.tasks.activities', 'locks')->get();
         } elseif ($user->hasRole(['Manager', 'Executive'])) {
             // Manager and Executive can see projects they are assigned to directly or through their team
-            $projects = Project::with('createdBy')
+            $projects = Project::with('createdBy', 'groups.tasks.activities', 'locks')
                 ->where(function ($query) use ($user) {
                     $query->whereHas('users', function ($q) use ($user) {
                         $q->where('project_assignments.assignable_id', $user->id)

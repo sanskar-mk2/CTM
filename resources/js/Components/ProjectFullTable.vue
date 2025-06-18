@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed } from "vue";
 import { to_roman_numerical } from "@/util";
+import dayjs from "dayjs";
+import _ from "lodash";
 
 const props = defineProps({
     projects: {
@@ -29,6 +31,7 @@ const allColumns = ref([
     { key: "phase", label: "Phase", visible: true },
     { key: "therapeutic_area", label: "Therapeutic Area", visible: true },
     { key: "sponsor_country", label: "Sponsor Country", visible: true },
+    { key: "amount_done", label: "Amount Done", visible: true },
 ]);
 
 const visibleColumns = computed(() => allColumns.value.filter((c) => c.visible));
@@ -50,6 +53,16 @@ const moveDown = (index) => {
     [cols[index + 1], cols[index]] = [cols[index], cols[index + 1]];
 };
 
+// Helper for sumActual
+const sumActual = (activities, locks) => {
+    return _.sumBy(activities, (activity) => {
+        const lockEntry = locks?.find((lock) =>
+            dayjs(lock.date).isSame(dayjs(activity.date), "month")
+        );
+        return lockEntry && lockEntry.is_locked ? activity.value : 0;
+    });
+};
+
 // Formatting for table & CSV
 const formatCell = (project, colKey) => {
     switch (colKey) {
@@ -57,6 +70,14 @@ const formatCell = (project, colKey) => {
             return project.status ? "Active" : "Inactive";
         case "phase":
             return to_roman_numerical(project.phase);
+        case "amount_done":
+            if (!project.groups || !project.locks) return 0;
+            const total = _.sumBy(project.groups, (group) =>
+                _.sumBy(group.tasks || [], (task) =>
+                    sumActual(task.activities || [], project.locks) * (task.price || 0)
+                )
+            );
+            return Intl.NumberFormat("en-US").format(total);
         default:
             return project[colKey] ?? "-";
     }

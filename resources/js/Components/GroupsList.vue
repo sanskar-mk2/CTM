@@ -73,6 +73,7 @@ const changeOrderTasks = computed(() => {
                 actual,
                 exceeded: actual - task.quantity,
                 unit: task.unit,
+                price: task.price,
             };
         })
         .filter((task) => task.exceeded > 0);
@@ -87,7 +88,8 @@ function exportChangeOrdersToExcel() {
             "Unit",
             "Allowed Quantity",
             "Actual Units Done",
-            "Exceeded By",
+            "Units Exceeded",
+            "Amount Exceeded",
         ],
         ...changeOrderTasks.value.map((task) => [
             task.groupName,
@@ -95,7 +97,8 @@ function exportChangeOrdersToExcel() {
             task.unit,
             task.quantity,
             task.actual,
-            task.exceeded,
+            `+${task.exceeded}`,
+            `+${Intl.NumberFormat('en-US').format(task.exceeded * task.price)}`,
         ]),
     ];
     // Convert to CSV string
@@ -114,8 +117,8 @@ function exportChangeOrdersToExcel() {
 </script>
 
 <template>
-    <div class="overflow-x-auto p-4 bg-white rounded-lg shadow-md">
-        <table class="table table-pin-rows table-pin-cols min-w-full text-sm">
+    <div class="overflow-auto bg-white rounded-lg shadow-md h-[80vh]">
+        <table class="table min-w-full text-sm">
             <thead class="text-center bg-gray-100 sticky top-0 z-10">
                 <tr>
                     <th class="py-2">Tasks</th>
@@ -213,7 +216,7 @@ function exportChangeOrdersToExcel() {
                                     auth.user
                                 )
                             "
-                            class="btn btn-warning py-1 px-2 text-xs rounded-md flex items-center gap-1 shadow-sm hover:shadow-md transition"
+                            class="btn btn-warning btn-md !py-0 px-2 text-xs rounded-md flex items-center gap-1"
                             @click="showChangeOrderModal = true"
                             title="See change order activity"
                         >
@@ -236,6 +239,7 @@ function exportChangeOrdersToExcel() {
                             .subtract(1, 'day')
                             .format('YYYY-MM-DD')
                     "
+                    :months="project.months"
                 />
             </tbody>
         </table>
@@ -260,7 +264,8 @@ function exportChangeOrdersToExcel() {
                             <th>Unit</th>
                             <th>Allowed Quantity</th>
                             <th>Actual Units Done</th>
-                            <th>Exceeded By</th>
+                            <th>Units Exceeded</th>
+                            <th>Amount Exceeded</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -276,6 +281,9 @@ function exportChangeOrdersToExcel() {
                             <td>{{ task.actual }}</td>
                             <td class="text-red-600 font-bold">
                                 +{{ task.exceeded }}
+                            </td>
+                            <td class="text-red-600 font-bold">
+                                +{{ Intl.NumberFormat('en-US').format(task.exceeded * task.price) }}
                             </td>
                         </tr>
                     </tbody>
