@@ -8,6 +8,8 @@ use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Team;
 use App\Models\User;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
+use App\Models\CurrencyMaster;
 
 class ProjectController extends Controller
 {
@@ -51,8 +53,17 @@ class ProjectController extends Controller
             $projects = collect();
         }
 
+        // Get superset of all months in activities
+        $months = DB::table('activities')
+            ->selectRaw("DATE_FORMAT(date, '%Y-%m') as ym")
+            ->distinct()
+            ->orderBy('ym')
+            ->pluck('ym');
+
         return Inertia::render('Projects/Index', [
             'projects' => $projects,
+            'months' => $months,
+            'currencies' => CurrencyMaster::all(),
         ]);
     }
 

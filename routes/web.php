@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('/tasks', TaskController::class)->only('store');
     Route::get('/sample_export/{project}', SampleExportController::class)->name('sample_export');
     Route::get('/project_export/{project}', ProjectExportController::class)->name('project_export');
+    Route::get('/projects/all-activity-months', [ProjectController::class, 'allActivityMonths'])->name('projects.allActivityMonths');
 });
 
 require __DIR__ . '/auth.php';

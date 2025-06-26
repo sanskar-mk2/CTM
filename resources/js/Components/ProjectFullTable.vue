@@ -9,6 +9,16 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    months: {
+        type: Array,
+        required: false,
+        default: () => [],
+    },
+    currencies: {
+        type: Array,
+        required: false,
+        default: () => [],
+    },
 });
 
 // Column definitions
@@ -63,6 +73,92 @@ const sumActual = (activities, locks) => {
     });
 };
 
+// Helper to sum activity value for a project for a given month
+const sumActivityForMonth = (project, month) => {
+    let total = 0;
+    if (!project.groups) return 0;
+    project.groups.forEach((group) => {
+        (group.tasks || []).forEach((task) => {
+            (task.activities || []).forEach((activity) => {
+                if (activity.date && dayjs(activity.date).format('YYYY-MM') === month) {
+                    total += activity.value * (task.price || 0);
+                }
+            });
+        });
+    });
+    return total;
+};
+
+const getFinancialYear = (month) => {
+    const d = dayjs(month + "-01");
+    const year = d.year();
+    const monthNum = d.month() + 1;
+    if (monthNum >= 4) {
+        return `${year}-${String(year + 1).slice(-2)}`;
+    } else {
+        return `${year - 1}-${String(year).slice(-2)}`;
+    }
+};
+
+const financialYearData = computed(() => {
+    if (!props.months || props.months.length === 0) {
+        return {};
+    }
+    const grouped = _.groupBy(props.months, getFinancialYear);
+    const sortedFYs = Object.keys(grouped).sort();
+    const result = {};
+    for (const fy of sortedFYs) {
+        result[fy] = grouped[fy].sort((a, b) =>
+            dayjs(a).isBefore(dayjs(b)) ? -1 : 1
+        );
+    }
+    return result;
+});
+
+const getFYTotal = (project, monthsInFY) => {
+    return _.sumBy(monthsInFY, (month) => sumActivityForMonth(project, month));
+};
+
+const cumulativeTotals = computed(() => {
+    const totals = {};
+    const allFYs = Object.keys(financialYearData.value).sort();
+    props.projects.forEach((project) => {
+        let cumulative = 0;
+        allFYs.forEach((fy) => {
+            const monthsInFY = financialYearData.value[fy];
+            const fyTotal = getFYTotal(project, monthsInFY);
+            cumulative += fyTotal;
+            totals[`${project.id}-${fy}`] = cumulative;
+        });
+    });
+    return totals;
+});
+
+const getCumulativeTotalUpToFY = (project, fy) => {
+    return cumulativeTotals.value[`${project.id}-${fy}`] || 0;
+};
+
+// Helper to get exchange rate for a currency symbol
+const getExchangeRate = (symbol) => {
+    const found = props.currencies.find((c) => c.symbol === symbol);
+    return found ? Number(found.exchange_rate_to_inr) : 1;
+};
+
+// Helper to format month as M/YY
+const formatMonth = (month) => {
+    return dayjs(month + '-01').format('MMM/YY');
+};
+
+const formatNumber = (value) => {
+    if (typeof value !== "number") return value;
+    return value.toLocaleString("en-US");
+};
+
+const formatInr = (value) => {
+    if (typeof value !== "number") return value;
+    return value.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+};
+
 // Formatting for table & CSV
 const formatCell = (project, colKey) => {
     switch (colKey) {
@@ -83,20 +179,62 @@ const formatCell = (project, colKey) => {
     }
 };
 
+const getChangeOrder = (balance) => {
+    return balance < 0 ? Math.abs(balance) : 0;
+};
+
 // CSV export
 const exportCSV = () => {
     const cols = visibleColumns.value;
-    const headers = cols.map((c) => c.label);
-    const rows = props.projects.map((proj) =>
-        cols
-            .map((c) => {
-                const val = formatCell(proj, c.key);
-                // Escape quotes
-                const s = String(val ?? "").replace(/"/g, '""');
-                return `"${s}"`;
-            })
-            .join(",")
-    );
+
+    const dynamicHeaders = [];
+    Object.entries(financialYearData.value).forEach(([fy, months]) => {
+        months.forEach((month) => {
+            dynamicHeaders.push(formatMonth(month));
+            dynamicHeaders.push(`${formatMonth(month)} (INR)`);
+        });
+        dynamicHeaders.push(`FY ${fy} Total`);
+        dynamicHeaders.push(`FY ${fy} Total (INR)`);
+        dynamicHeaders.push(`Balance`);
+        dynamicHeaders.push(`Balance (INR)`);
+        dynamicHeaders.push(`Change Order`);
+        dynamicHeaders.push(`Change Order (INR)`);
+    });
+    const headers = [...cols.map((c) => c.label), ...dynamicHeaders];
+
+    const rows = props.projects.map((proj) => {
+        const base = cols.map((c) => {
+            const val = formatCell(proj, c.key);
+            return `"${String(val ?? "").replace(/"/g, '""')}"`;
+        });
+
+        const dynamicCells = [];
+        const exchangeRate = getExchangeRate(proj.currency);
+        Object.entries(financialYearData.value).forEach(([fy, months]) => {
+            months.forEach((month) => {
+                const monthTotal = sumActivityForMonth(proj, month);
+                dynamicCells.push(`"${formatNumber(monthTotal)}"`);
+                dynamicCells.push(
+                    `"${formatInr(monthTotal * exchangeRate)}"`
+                );
+            });
+
+            const fyTotal = getFYTotal(proj, months);
+            dynamicCells.push(`"${formatNumber(fyTotal)}"`);
+            dynamicCells.push(`"${formatInr(fyTotal * exchangeRate)}"`);
+
+            const cumulativeTotal = getCumulativeTotalUpToFY(proj, fy);
+            let balance = (proj.contract_value || 0) - cumulativeTotal;
+            let changeOrder = getChangeOrder(balance);
+            if (balance < 0) balance = 0;
+            dynamicCells.push(`"${formatNumber(balance)}"`);
+            dynamicCells.push(`"${formatInr(balance * exchangeRate)}"`);
+            dynamicCells.push(`"${formatNumber(changeOrder)}"`);
+            dynamicCells.push(`"${formatInr(changeOrder * exchangeRate)}"`);
+        });
+
+        return [...base, ...dynamicCells].join(",");
+    });
     const csvContent = [headers.join(","), ...rows].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -126,20 +264,95 @@ const exportCSV = () => {
             <table class="table table-zebra w-full">
                 <thead>
                     <tr>
-                        <th v-for="col in visibleColumns" :key="col.key">
+                        <th
+                            v-for="col in visibleColumns"
+                            :key="col.key"
+                            :class="{
+                                'sticky left-0 z-10 bg-base-100': col.fixed,
+                            }"
+                        >
                             {{ col.label }}
                         </th>
+                        <template
+                            v-for="(months, fy) in financialYearData"
+                            :key="fy"
+                        >
+                            <template v-for="month in months" :key="month">
+                                <th>{{ formatMonth(month) }}</th>
+                                <th>{{ formatMonth(month) }} (INR)</th>
+                            </template>
+                            <th>FY {{ fy }} Total</th>
+                            <th>FY {{ fy }} Total (INR)</th>
+                            <th>Balance</th>
+                            <th>Balance (INR)</th>
+                            <th>Change Order</th>
+                            <th>Change Order (INR)</th>
+                        </template>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="project in projects" :key="project.id">
+                    <tr v-for="(project, index) in projects" :key="project.id">
                         <td
                             v-for="col in visibleColumns"
                             :key="col.key"
-                            :class="col.bold ? 'font-bold' : ''"
+                            :class="{
+                                'font-bold': col.bold,
+                                'sticky left-0 z-10': col.fixed,
+                                'bg-base-200': col.fixed && index % 2 === 1,
+                                'bg-base-100': col.fixed && index % 2 === 0,
+                            }"
                         >
                             {{ formatCell(project, col.key) }}
                         </td>
+                        <template
+                            v-for="(monthsInFY, fy) in financialYearData"
+                            :key="fy"
+                        >
+                            <template v-for="month in monthsInFY" :key="month">
+                                <td>{{ formatNumber(sumActivityForMonth(project, month)) }}</td>
+                                <td>
+                                    {{
+                                        formatInr(sumActivityForMonth(project, month) * getExchangeRate(project.currency))
+                                    }}
+                                </td>
+                            </template>
+                            <td class="font-bold">
+                                {{ formatNumber(getFYTotal(project, monthsInFY)) }}
+                            </td>
+                            <td class="font-bold">
+                                {{ formatInr(getFYTotal(project, monthsInFY) * getExchangeRate(project.currency)) }}
+                            </td>
+                            <td class="font-bold">
+                                {{
+                                    formatNumber(
+                                        Math.max(0, (project.contract_value || 0) - getCumulativeTotalUpToFY(project, fy))
+                                    )
+                                }}
+                            </td>
+                            <td class="font-bold">
+                                {{
+                                    formatInr(
+                                        Math.max(0, (project.contract_value || 0) - getCumulativeTotalUpToFY(project, fy)) *
+                                            getExchangeRate(project.currency)
+                                    )
+                                }}
+                            </td>
+                            <td class="font-bold">
+                                {{
+                                    formatNumber(
+                                        getChangeOrder((project.contract_value || 0) - getCumulativeTotalUpToFY(project, fy))
+                                    )
+                                }}
+                            </td>
+                            <td class="font-bold">
+                                {{
+                                    formatInr(
+                                        getChangeOrder((project.contract_value || 0) - getCumulativeTotalUpToFY(project, fy)) *
+                                            getExchangeRate(project.currency)
+                                    )
+                                }}
+                            </td>
+                        </template>
                     </tr>
                 </tbody>
             </table>

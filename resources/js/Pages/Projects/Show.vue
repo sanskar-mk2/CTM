@@ -159,7 +159,7 @@ const showDates = ref(true);
         </template>
 
         <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="w-full mx-auto px-2">
                 <div
                     v-if="hasRole(['Admin', 'Super Admin'], auth.user)"
                     class="bg-white shadow-sm sm:rounded-lg"

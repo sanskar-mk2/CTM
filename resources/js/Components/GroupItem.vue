@@ -79,7 +79,10 @@ const sumTotal = (activities) => {
         :show-dates="showDates"
     />
     <tr class="bg-blue-50 border-b border-blue-200">
-        <th colspan="6" class="text-start font-bold text-blue-800 py-2 pr-4">
+        <th
+            :colspan="showDates ? 6 : 4"
+            class="text-start font-bold text-blue-800 py-2 pr-4"
+        >
             {{ group.name }} Total
         </th>
         <th class="font-extrabold text-green-700">
@@ -93,7 +96,9 @@ const sumTotal = (activities) => {
             {{
                 _.sumBy(group.tasks, (task) =>
                     _.sumBy(
-                        task.activities.filter((a) => dayjs(a.date).isSame(dayjs(month), "month")),
+                        task.activities.filter((a) =>
+                            dayjs(a.date).isSame(dayjs(month), "month")
+                        ),
                         "value"
                     )
                 )
@@ -108,7 +113,10 @@ const sumTotal = (activities) => {
         <td>
             {{
                 Intl.NumberFormat("en-US").format(
-                    _.sumBy(group.tasks, (task) => sumActual(task.activities) * task.price)
+                    _.sumBy(
+                        group.tasks,
+                        (task) => sumActual(task.activities) * task.price
+                    )
                 )
             }}
         </td>

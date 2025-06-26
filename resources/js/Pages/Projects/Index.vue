@@ -2,7 +2,7 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import { Head, Link, router } from "@inertiajs/vue3";
 import { hasRole } from "@/util";
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import ProjectFullTable from "@/Components/ProjectFullTable.vue";
 
 defineProps({
@@ -14,6 +14,16 @@ defineProps({
         type: Object,
         required: true,
     },
+    months: {
+        type: Array,
+        required: false,
+        default: () => [],
+    },
+    currencies: {
+        type: Array,
+        required: false,
+        default: () => [],
+    },
 });
 
 import { to_roman_numerical } from "@/util";
@@ -24,6 +34,7 @@ const deleteProject = (id) => {
 };
 
 const showComparisonTable = ref(false);
+
 </script>
 
 <template>
@@ -72,6 +83,8 @@ const showComparisonTable = ref(false);
                             <ProjectFullTable
                                 v-if="showComparisonTable"
                                 :projects="projects"
+                                :months="months"
+                                :currencies="currencies"
                             />
 
                             <!-- Default condensed table -->
