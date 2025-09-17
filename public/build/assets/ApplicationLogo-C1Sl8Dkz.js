@@ -1,0 +1,1 @@
+import{_ as t}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{o as e,f as s,t as n}from"./app-DdKurr7Z.js";const r={},a={class:"font-bold text-3xl"};function c(o,p){return e(),s("h1",a,n(o.$page.props.app.name),1)}const f=t(r,[["render",c]]);export{f as A};
